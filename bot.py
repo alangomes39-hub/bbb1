@@ -1,19 +1,26 @@
 import os
 import logging
 import aiosqlite
-from datetime import datetime, time, date
+from datetime import datetime, time
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from telegram import (
-    Update, InlineKeyboardButton, InlineKeyboardMarkup
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
 )
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, CallbackQueryHandler,
-    MessageHandler, ContextTypes, filters
+    ApplicationBuilder,
+    CommandHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
 )
 
 # =====================================================
-# CONFIG
+# CONFIGURAÇÕES
 # =====================================================
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -25,18 +32,13 @@ DB_FILE = "bot_database.db"
 
 PIX_LINK = "https://livepix.gg/proletariado"
 
-# =====================================================
-# LOG
-# =====================================================
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("bot")
 
 # =====================================================
-# FASTAPI + TELEGRAM
+# TELEGRAM APPLICATION
 # =====================================================
 
-app = FastAPI()
 tg_app = ApplicationBuilder().token(BOT_TOKEN).build()
 
 # =====================================================
@@ -52,14 +54,14 @@ TEXT_PT_LISTA = """🎉 Promoção Imperdível! 🎉
 ⏳ Acervo 2019–2021 — R$50  
 🤖 Pacote 2022–2025 — R$150  
 
-🆕 *NOVOS CANAIS (ACESSO A PARTIR DE 02/01/2026)*  
+🆕 *NOVOS CANAIS (LIBERAÇÃO EM 02/01/2026)*  
 🇧🇷 Brasil 2026 — R$85 *(promo: R$40)*  
 📆 Canal 2026 — R$75 *(promo: R$30)*  
 """
 
 TEXT_PT_VIP = """🔥 CANAL VIP SÓ BRASILEIRAS — R$80  
 
-⚠️ *Canais 2026 serão liberados em 02/01/2026*  
+⚠️ *Os canais 2026 só serão liberados a partir de 02/01/2026.*  
 """
 
 TEXT_EN = """🎉 Unmissable Promotion! 🎉
@@ -77,7 +79,7 @@ TEXT_EN = """🎉 Unmissable Promotion! 🎉
 """
 
 # =====================================================
-# DATABASE
+# BANCO DE DADOS
 # =====================================================
 
 async def init_db():
@@ -114,7 +116,7 @@ async def save_order(user, lang, product, method):
         await db.commit()
 
 # =====================================================
-# START / LANGUAGE
+# /START + IDIOMA
 # =====================================================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -140,6 +142,7 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("💳 Pagar com Pix", callback_data="pay_pix")],
             [InlineKeyboardButton("📞 Suporte", callback_data="support")]
         ]
+        label = "Escolha uma opção:"
     else:
         await q.message.reply_text(TEXT_EN, parse_mode="Markdown")
         kb = [
@@ -149,28 +152,25 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("₿ Bitcoin", callback_data="pay_btc")],
             [InlineKeyboardButton("📞 Support", callback_data="support")]
         ]
+        label = "Choose an option:"
 
-    await q.message.reply_text(
-        "Escolha uma opção:" if lang == "pt" else "Choose an option:",
-        reply_markup=InlineKeyboardMarkup(kb)
-    )
+    await q.message.reply_text(label, reply_markup=InlineKeyboardMarkup(kb))
 
 # =====================================================
-# PAYMENT
+# PAGAMENTO / SUPORTE
 # =====================================================
 
 async def payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     user = q.from_user
     lang = context.user_data.get("lang", "pt")
-    method = q.data.replace("pay_", "")
-
     await q.answer()
 
     if q.data == "support":
         await q.message.reply_text("@proletariado")
         return
 
+    method = q.data.replace("pay_", "")
     await save_order(user, lang, "manual", method)
     context.user_data["awaiting_proof"] = True
 
@@ -180,10 +180,16 @@ async def payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             disable_web_page_preview=True
         )
     else:
-        await q.message.reply_text("Send payment proof.")
+        msg = (
+            "📌 Envie o comprovante de pagamento."
+            if lang == "pt"
+            else
+            "📌 Please send the payment proof."
+        )
+        await q.message.reply_text(msg)
 
 # =====================================================
-# PROOF
+# RECEBER COMPROVANTE
 # =====================================================
 
 async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -194,10 +200,10 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = context.user_data.get("lang", "pt")
 
     msg = (
-        "✅ Comprovante recebido. Aguarde aprovação."
+        "✅ Comprovante recebido. Aguarde a verificação."
         if lang == "pt"
         else
-        "✅ Proof received. Please wait."
+        "✅ Proof received. Please wait for verification."
     )
 
     await update.message.reply_text(msg)
@@ -209,18 +215,18 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =====================================================
-# JOB — AVISO 02/01/2026
+# JOB — AVISO AUTOMÁTICO 02/01/2026
 # =====================================================
 
 async def aviso_2026(context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(
         ADMIN_CHAT_ID,
-        "🚨 HOJE (02/01/2026): liberar acesso aos canais 2026"
+        "🚨 HOJE (02/01/2026): liberar acesso aos canais 2026."
     )
 
 tg_app.job_queue.run_daily(
     aviso_2026,
-    time=time(9, 0),
+    time=time(hour=9, minute=0),
     days=(0,1,2,3,4,5,6),
     name="aviso_2026"
 )
@@ -231,27 +237,38 @@ tg_app.job_queue.run_daily(
 
 tg_app.add_handler(CommandHandler("start", start))
 tg_app.add_handler(CallbackQueryHandler(set_language, pattern="^lang_"))
-tg_app.add_handler(CallbackQueryHandler(payment_handler, pattern="^(pay_|support)"))
-tg_app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receive_proof))
+tg_app.add_handler(CallbackQueryHandler(payment_handler, pattern="^(pay_|support)$"))
+tg_app.add_handler(
+    MessageHandler(filters.PHOTO | filters.Document.ALL, receive_proof)
+)
 
 # =====================================================
-# WEBHOOK
+# FASTAPI LIFESPAN (CORREÇÃO APLICADA)
 # =====================================================
 
-@app.post("/webhook")
-async def webhook(req: Request):
-    data = await req.json()
-    update = Update.de_json(data, tg_app.bot)
-    await tg_app.process_update(update)
-    return {"ok": True}
-
-@app.on_event("startup")
-async def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # STARTUP
     await init_db()
     await tg_app.initialize()
     await tg_app.bot.set_webhook(f"{WEBHOOK_URL}/webhook")
     logger.info("Webhook configurado")
 
-@app.on_event("shutdown")
-async def shutdown():
+    yield  # app rodando
+
+    # SHUTDOWN
     await tg_app.shutdown()
+    logger.info("Bot desligado corretamente")
+
+app = FastAPI(lifespan=lifespan)
+
+# =====================================================
+# WEBHOOK ENDPOINT
+# =====================================================
+
+@app.post("/webhook")
+async def telegram_webhook(req: Request):
+    data = await req.json()
+    update = Update.de_json(data, tg_app.bot)
+    await tg_app.process_update(update)
+    return {"ok": True}
