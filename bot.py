@@ -139,7 +139,8 @@ Regular price: $55
 🎁 Pre-sale: $30
 
 ⚠️ IMPORTANT:
-Access ONLY on 01/02/2026.
+Access ONLY on January 2nd, 2026.
+Date format: US system (MM/DD/YYYY).
 """
 
 # =====================================================
@@ -176,7 +177,7 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🌏 Filipinas", callback_data="buy_ph")],
         [InlineKeyboardButton("⏳ Acervo" if lang == "pt" else "⏳ Archive", callback_data="buy_archive")],
         [InlineKeyboardButton("🤖 Pacote" if lang == "pt" else "🤖 Package", callback_data="buy_package")],
-        [InlineKeyboardButton("📆 Canal 2026 (Pré)", callback_data="buy_2026")],
+        [InlineKeyboardButton("📆 Channel 2026 (Pre-sale)", callback_data="buy_2026")],
     ]
 
     if lang == "pt":
@@ -267,6 +268,7 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     order = await get_last_order_for_user(user.id)
 
+    # ✅ envia confirmação ao cliente
     if order:
         if order[3] == "pt":
             await update.message.reply_text(
@@ -280,6 +282,20 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "⏳ Your order is under review.\n"
                 "Please wait."
             )
+
+    # ✅ ENVIA O COMPROVANTE PARA O ADMIN (como antes)
+    if update.message.photo:
+        await application.bot.send_photo(
+            chat_id=ADMIN_CHAT_ID,
+            photo=update.message.photo[-1].file_id,
+            caption="📎 Comprovante enviado pelo cliente"
+        )
+    elif update.message.document:
+        await application.bot.send_document(
+            chat_id=ADMIN_CHAT_ID,
+            document=update.message.document.file_id,
+            caption="📎 Comprovante enviado pelo cliente"
+        )
 
     panel = (
         f"User ID: {order[1]}\n"
@@ -299,7 +315,6 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📤 Enviar link", callback_data=f"admin_send_{order[0]}")],
     ]
 
-    # ✅ BOTÃO DE IDENTIFICAÇÃO DE PRÉ-VENDA (RESTaurado)
     if order[6]:
         kb.append([InlineKeyboardButton("🟣 Pedido 2026", callback_data=f"admin_2026_{order[0]}")])
 
