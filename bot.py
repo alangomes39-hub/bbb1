@@ -256,7 +256,7 @@ async def payment_methods(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["awaiting_proof"] = True
 
 # =====================================================
-# RECEIVE PROOF
+# RECEIVE PROOF + ADMIN PANEL
 # =====================================================
 
 async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -299,6 +299,10 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📤 Enviar link", callback_data=f"admin_send_{order[0]}")],
     ]
 
+    # ✅ BOTÃO DE IDENTIFICAÇÃO DE PRÉ-VENDA (RESTaurado)
+    if order[6]:
+        kb.append([InlineKeyboardButton("🟣 Pedido 2026", callback_data=f"admin_2026_{order[0]}")])
+
     await application.bot.send_message(
         ADMIN_CHAT_ID,
         panel,
@@ -340,6 +344,9 @@ async def admin_panel_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     elif action == "send":
         context.user_data["awaiting_link"] = uid
         await q.message.reply_text("📤 Envie o link para o cliente.")
+
+    elif action == "2026":
+        await q.message.reply_text("🟣 Pedido identificado como PRÉ-VENDA 2026.")
 
 # =====================================================
 # RECEIVE ADMIN LINK
