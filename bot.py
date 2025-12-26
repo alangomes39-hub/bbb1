@@ -1,7 +1,7 @@
 import os
 import logging
 import aiosqlite
-from datetime import datetime
+from datetime import datetime, date
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -25,10 +25,14 @@ from telegram.ext import (
 # =====================================================
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # https://bbb1-production.up.railway.app
-WEBHOOK_PATH = "/webhook"
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "5067341383"))
 DB_FILE = "database.db"
+WEBHOOK_PATH = "/webhook"
+
+LAUNCH_DATE_2026 = date(2026, 1, 2)
+
+PIX_CODE = "https://livepix.gg/proletariado"
 
 # =====================================================
 # LOG
@@ -49,65 +53,96 @@ async def init_db():
             user_id INTEGER,
             username TEXT,
             language TEXT,
+            product TEXT,
             payment_method TEXT,
             status TEXT,
+            is_2026 INTEGER,
             created_at TEXT
         )
         """)
         await db.commit()
 
-async def create_order(user, lang, method):
+async def create_order(user, lang, product, is_2026):
     async with aiosqlite.connect(DB_FILE) as db:
-        await db.execute(
-            "INSERT INTO orders (user_id, username, language, payment_method, status, created_at) VALUES (?,?,?,?,?,?)",
-            (
-                user.id,
-                user.username,
-                lang,
-                method,
-                "pending",
-                datetime.utcnow().isoformat()
-            )
-        )
+        await db.execute("""
+            INSERT INTO orders
+            (user_id, username, language, product, payment_method, status, is_2026, created_at)
+            VALUES (?,?,?,?,?,?,?,?)
+        """, (
+            user.id,
+            user.username,
+            lang,
+            product,
+            "pix",
+            "pending",
+            1 if is_2026 else 0,
+            datetime.utcnow().isoformat()
+        ))
         await db.commit()
 
-async def get_last_order(user_id):
+async def get_2026_buyers():
     async with aiosqlite.connect(DB_FILE) as db:
-        cur = await db.execute(
-            "SELECT * FROM orders WHERE user_id=? ORDER BY id DESC LIMIT 1",
-            (user_id,)
-        )
-        return await cur.fetchone()
-
-async def get_order(order_id):
-    async with aiosqlite.connect(DB_FILE) as db:
-        cur = await db.execute(
-            "SELECT * FROM orders WHERE id=?",
-            (order_id,)
-        )
-        return await cur.fetchone()
-
-async def update_status(order_id, status):
-    async with aiosqlite.connect(DB_FILE) as db:
-        await db.execute(
-            "UPDATE orders SET status=? WHERE id=?",
-            (status, order_id)
-        )
-        await db.commit()
-
-async def list_orders():
-    async with aiosqlite.connect(DB_FILE) as db:
-        cur = await db.execute(
-            "SELECT id, user_id, username, payment_method, status, created_at FROM orders ORDER BY id DESC LIMIT 20"
-        )
+        cur = await db.execute("""
+            SELECT user_id, language, product FROM orders
+            WHERE is_2026=1 AND status='approved'
+        """)
         return await cur.fetchall()
 
 # =====================================================
-# TEXTOS
+# TEXTOS – CLIENTE
 # =====================================================
 
-TEXT_PT = "💳 PIX:\nhttps://livepix.gg/proletariado\n\nEnvie o comprovante."
-TEXT_EN = "Send your payment proof."
+TEXT_PT_LISTA = """🎉 PROMOÇÃO IMPERDÍVEL 🎉
+
+💎 Grupo Premium — R$120
+🌟 Grupo 2024/2025 — R$60
+🌍 Russas — R$45
+🌏 Filipinas — R$40
+⏳ Acervo 2019–2021 — R$50
+🤖 Pacote 2022–2025 — R$150
+
+🔥🔥 NOVOS CANAIS 2026 🔥🔥
+
+🇧🇷 Brasil 2026
+Valor normal: R$85
+🎁 Pré-venda: R$40
+
+📆 Canal 2026
+Valor normal: R$75
+🎁 Pré-venda: R$30
+
+⚠️ ATENÇÃO:
+O acesso aos canais 2026 e Brasil 2026
+será liberado APENAS em 02/01/2026.
+Ao comprar agora, você garante a vaga
+no valor promocional.
+"""
+
+TEXT_EN_LISTA = """🎉 UNMISSABLE PROMOTION 🎉
+
+💎 Premium — $50
+🌟 2024/2025 — $45
+🌍 Russian — $35
+🌏 Philippines — $30
+⏳ Old Content — $25
+🤖 Package — $60
+
+🔥🔥 NEW 2026 CHANNELS 🔥🔥
+
+🇧🇷 Brazil 2026
+Regular price: $55
+🎁 Pre-sale: $30
+
+📆 Channel 2026
+Regular price: $55
+🎁 Pre-sale: $30
+
+⚠️ IMPORTANT:
+Access to 2026 channels
+will be released ONLY on 01/02/2026.
+Buying now guarantees your spot
+at the promotional price.
+"""
 
 # =====================================================
 # BOT HANDLERS
@@ -130,133 +165,63 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = q.data.replace("lang_", "")
     context.user_data["lang"] = lang
 
-    kb = [[InlineKeyboardButton("💳 Pagar", callback_data="pay")]]
+    text = TEXT_PT_LISTA if lang == "pt" else TEXT_EN_LISTA
 
-    await q.message.reply_text(
-        TEXT_PT if lang == "pt" else TEXT_EN,
-        reply_markup=InlineKeyboardMarkup(kb)
-    )
+    kb = [
+        [InlineKeyboardButton("💎 Premium", callback_data="buy_premium")],
+        [InlineKeyboardButton("🌟 2024/2025", callback_data="buy_2025")],
+        [InlineKeyboardButton("🇧🇷 Brasil 2026 (Pré-venda)", callback_data="buy_brasil2026")],
+        [InlineKeyboardButton("📆 Canal 2026 (Pré-venda)", callback_data="buy_2026")]
+    ]
 
-async def pay(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await q.message.reply_text(text, reply_markup=InlineKeyboardMarkup(kb))
+
+async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
 
     user = q.from_user
     lang = context.user_data.get("lang", "pt")
 
-    await create_order(user, lang, "pix")
+    product_map = {
+        "buy_brasil2026": ("Brasil 2026", True),
+        "buy_2026": ("Canal 2026", True),
+        "buy_premium": ("Premium", False),
+        "buy_2025": ("2024/2025", False)
+    }
+
+    product, is_2026 = product_map[q.data]
+
+    await create_order(user, lang, product, is_2026)
     context.user_data["awaiting_proof"] = True
 
-    await q.message.reply_text(TEXT_PT if lang == "pt" else TEXT_EN)
-
-async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.user_data.get("awaiting_proof"):
-        return
-
-    context.user_data["awaiting_proof"] = False
-    user = update.effective_user
-    order = await get_last_order(user.id)
-
-    await update.message.reply_text(
-        "✅ Comprovante recebido! Aguarde."
-        if context.user_data.get("lang") == "pt"
-        else "✅ Proof received! Please wait."
+    msg = (
+        f"💳 PIX:\n{PIX_CODE}\n\nEnvie o comprovante."
+        if lang == "pt"
+        else "Send your payment proof."
     )
 
-    kb = [[InlineKeyboardButton(
-        "🔍 Abrir painel do pedido",
-        callback_data=f"admin_panel_{order[0]}"
-    )]]
-
-    await application.bot.send_message(
-        ADMIN_CHAT_ID,
-        f"📩 Novo comprovante\nPedido #{order[0]}\nUsuário: @{user.username}",
-        reply_markup=InlineKeyboardMarkup(kb)
-    )
-
-    await application.bot.copy_message(
-        ADMIN_CHAT_ID,
-        update.message.chat_id,
-        update.message.message_id
-    )
+    await q.message.reply_text(msg)
 
 # =====================================================
-# ADMIN PANEL
+# ADMIN + LEMBRETE 2026
 # =====================================================
 
-async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
+async def notify_2026(context: ContextTypes.DEFAULT_TYPE):
+    buyers = await get_2026_buyers()
 
-    if q.from_user.id != ADMIN_CHAT_ID:
-        return
-
-    _, action, oid = q.data.split("_")
-    oid = int(oid)
-    order = await get_order(oid)
-
-    if not order:
-        await q.message.reply_text("Pedido não encontrado.")
-        return
-
-    if action == "panel":
-        kb = [
-            [InlineKeyboardButton("✅ Aprovar", callback_data=f"admin_approve_{oid}")],
-            [InlineKeyboardButton("❌ Rejeitar", callback_data=f"admin_reject_{oid}")],
-            [InlineKeyboardButton("📤 Enviar link", callback_data=f"admin_send_{oid}")]
-        ]
-        await q.message.reply_text(
-            f"📦 Pedido #{oid}\nStatus: {order[5]}",
-            reply_markup=InlineKeyboardMarkup(kb)
-        )
-
-    elif action == "approve":
-        await update_status(oid, "approved")
-        await q.message.reply_text("Pagamento aprovado. Envie o link.")
-        context.user_data["send_link"] = oid
-
-    elif action == "reject":
-        await update_status(oid, "rejected")
-        await application.bot.send_message(
-            order[1],
-            "❌ Pagamento rejeitado."
-        )
-
-    elif action == "send":
-        context.user_data["send_link"] = oid
-        await q.message.reply_text("Envie o link agora.")
-
-async def admin_send_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID:
-        return
-
-    oid = context.user_data.get("send_link")
-    if not oid:
-        return
-
-    order = await get_order(oid)
-    link = update.message.text
-
-    await application.bot.send_message(
-        order[1],
-        f"🎉 Pagamento aprovado!\n\nAqui está seu link:\n{link}"
+    await context.bot.send_message(
+        ADMIN_CHAT_ID,
+        "🚀 HOJE É 02/01/2026!\n\nLibere os links dos canais 2026."
     )
 
-    await update_status(oid, "delivered")
-    await update.message.reply_text("✅ Link enviado.")
-    context.user_data["send_link"] = None
-
-async def admin_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID:
-        return
-
-    rows = await list_orders()
-    text = "📊 Últimos pedidos:\n\n"
-
-    for r in rows:
-        text += f"#{r[0]} | @{r[2]} | {r[3]} | {r[4]}\n"
-
-    await update.message.reply_text(text)
+    for user_id, lang, product in buyers:
+        msg = (
+            f"🎉 O canal {product} foi liberado!\nEntre em contato para receber o link."
+            if lang == "pt"
+            else f"🎉 The {product} channel is now live!\nContact support to receive your link."
+        )
+        await context.bot.send_message(user_id, msg)
 
 # =====================================================
 # FASTAPI + LIFESPAN
@@ -273,20 +238,18 @@ async def lifespan(app: FastAPI):
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("admin_history", admin_history))
     application.add_handler(CallbackQueryHandler(set_language, pattern="^lang_"))
-    application.add_handler(CallbackQueryHandler(pay, pattern="^pay$"))
-    application.add_handler(CallbackQueryHandler(admin_callback, pattern="^admin_"))
-    application.add_handler(
-        MessageHandler(filters.PHOTO | filters.Document.ALL, receive_proof)
-    )
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, admin_send_link)
-    )
+    application.add_handler(CallbackQueryHandler(buy, pattern="^buy_"))
 
     await application.initialize()
     await application.start()
     await application.bot.set_webhook(WEBHOOK_URL + WEBHOOK_PATH)
+
+    # Job 02/01/2026
+    application.job_queue.run_once(
+        notify_2026,
+        when=datetime(2026, 1, 2, 0, 5)
+    )
 
     yield
 
