@@ -2,6 +2,8 @@ import os
 import logging
 import aiosqlite
 from datetime import datetime, date
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from telegram import (
     Update,
@@ -18,34 +20,26 @@ from telegram.ext import (
     filters
 )
 
-# =========================================================
+# =====================================================
 # CONFIG
-# =========================================================
+# =====================================================
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # https://bbb1-production.up.railway.app
 WEBHOOK_PATH = "/webhook"
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "5067341383"))
-
 DB_FILE = "database.db"
 
-# =========================================================
-# LOGGING
-# =========================================================
+# =====================================================
+# LOG
+# =====================================================
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("bot")
 
-# =========================================================
-# FASTAPI
-# =========================================================
-
-app = FastAPI()
-tg_app: Application | None = None
-
-# =========================================================
+# =====================================================
 # DATABASE
-# =========================================================
+# =====================================================
 
 async def init_db():
     async with aiosqlite.connect(DB_FILE) as db:
@@ -61,20 +55,11 @@ async def init_db():
             created_at TEXT
         )
         """)
-        await db.execute("""
-        CREATE TABLE IF NOT EXISTS buyers_2026 (
-            user_id INTEGER,
-            username TEXT,
-            product TEXT,
-            language TEXT,
-            created_at TEXT
-        )
-        """)
         await db.commit()
 
-# =========================================================
-# TEXTS
-# =========================================================
+# =====================================================
+# TEXTOS
+# =====================================================
 
 TEXT_PT = """🎉 Promoção Imperdível! 🎉
 
@@ -85,15 +70,14 @@ TEXT_PT = """🎉 Promoção Imperdível! 🎉
 ⏳ Acervo 2019–2021 — R$50
 🤖 Pacote 2022–2025 — R$150
 
-🆕 *NOVOS CANAIS 2026*  
-🇧🇷 Brasil 2026 — R$85  
-📆 Canal 2026 — R$75  
+🆕 *NOVOS CANAIS 2026*
+🇧🇷 Brasil 2026 — R$85
+📆 Canal 2026 — R$75
 
-⚠️ *Aviso:*  
-Acesso liberado apenas em **02/01/2026**  
-🎁 Comprando agora:
-• Brasil 2026 → **R$40**
-• Canal 2026 → **R$30**
+⚠️ Acesso liberado em **02/01/2026**
+🎁 Pré-venda:
+• Brasil 2026 → R$40
+• Canal 2026 → R$30
 """
 
 TEXT_EN = """🎉 Unmissable Promotion! 🎉
@@ -109,18 +93,17 @@ TEXT_EN = """🎉 Unmissable Promotion! 🎉
 🇧🇷 Brazil 2026 — $55
 📆 Channel 2026 — $55
 
-⚠️ *Notice:*  
-Access only on **January 2, 2026**  
-🎁 Pre-sale price:
-• Brazil 2026 → **$30**
-• Channel 2026 → **$30**
+⚠️ Access on **January 2, 2026**
+🎁 Pre-sale:
+• Brazil 2026 → $30
+• Channel 2026 → $30
 """
 
 PIX_CODE = "https://livepix.gg/proletariado"
 
-# =========================================================
-# HANDLERS
-# =========================================================
+# =====================================================
+# BOT HANDLERS
+# =====================================================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kb = [
@@ -135,11 +118,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
+
     lang = q.data.replace("lang_", "")
     context.user_data["lang"] = lang
 
     if lang == "pt":
-        await q.message.reply_text(TEXT_PT, parse_mode="Markdown")
+        await q.message.reply_text(TEXT_PT)
         await q.message.reply_text(
             "💳 Pagar com PIX",
             reply_markup=InlineKeyboardMarkup([
@@ -147,9 +131,9 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ])
         )
     else:
-        await q.message.reply_text(TEXT_EN, parse_mode="Markdown")
+        await q.message.reply_text(TEXT_EN)
         await q.message.reply_text(
-            "💳 Payment options",
+            "💳 Payment",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("Pay", callback_data="pay_crypto")]
             ])
@@ -166,9 +150,7 @@ async def payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"💳 PIX:\n{PIX_CODE}\n\nEnvie o comprovante."
         )
     else:
-        await q.message.reply_text(
-            "Send your payment proof."
-        )
+        await q.message.reply_text("Send your payment proof.")
 
 async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("awaiting_proof"):
@@ -193,56 +175,56 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await db.commit()
 
     await update.message.reply_text(
-        "✅ Comprovante recebido! Aguarde confirmação."
+        "✅ Comprovante recebido!"
         if context.user_data.get("lang") == "pt"
-        else "✅ Proof received! Please wait."
+        else "✅ Proof received!"
     )
 
-    await tg_app.bot.send_message(
+    await application.bot.send_message(
         ADMIN_CHAT_ID,
         f"📩 Novo comprovante de @{user.username or user.id}"
     )
 
-# =========================================================
-# ADMIN REMINDER 02/01/2026
-# =========================================================
+# =====================================================
+# FASTAPI + LIFESPAN (CORRETO)
+# =====================================================
 
-async def check_2026_reminder():
-    if date.today() == date(2026, 1, 2):
-        await tg_app.bot.send_message(
-            ADMIN_CHAT_ID,
-            "📅 Hoje é 02/01/2026 — liberar acesso dos canais 2026!"
-        )
+application: Application | None = None
 
-# =========================================================
-# FASTAPI LIFESPAN
-# =========================================================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global application
 
-@app.on_event("startup")
-async def startup():
-    global tg_app
+    logger.info("🚀 Inicializando banco...")
     await init_db()
 
-    tg_app = ApplicationBuilder().token(BOT_TOKEN).build()
+    logger.info("🤖 Inicializando bot...")
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    tg_app.add_handler(CommandHandler("start", start))
-    tg_app.add_handler(CallbackQueryHandler(set_language, pattern="^lang_"))
-    tg_app.add_handler(CallbackQueryHandler(payment, pattern="^pay_"))
-    tg_app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receive_proof))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(set_language, pattern="^lang_"))
+    application.add_handler(CallbackQueryHandler(payment, pattern="^pay_"))
+    application.add_handler(
+        MessageHandler(filters.PHOTO | filters.Document.ALL, receive_proof)
+    )
 
-    await tg_app.initialize()
-    await tg_app.bot.set_webhook(WEBHOOK_URL + WEBHOOK_PATH)
+    await application.initialize()
+    await application.start()
+    await application.bot.set_webhook(WEBHOOK_URL + WEBHOOK_PATH)
 
-    logger.info("✅ Bot iniciado com webhook")
+    logger.info("✅ Bot iniciado e webhook configurado")
 
-@app.on_event("shutdown")
-async def shutdown():
-    if tg_app:
-        await tg_app.shutdown()
+    yield
+
+    logger.info("🛑 Encerrando bot...")
+    await application.stop()
+    await application.shutdown()
+
+app = FastAPI(lifespan=lifespan)
 
 @app.post(WEBHOOK_PATH)
 async def telegram_webhook(req: Request):
     data = await req.json()
-    update = Update.de_json(data, tg_app.bot)
-    await tg_app.process_update(update)
+    update = Update.de_json(data, application.bot)
+    await application.process_update(update)
     return {"ok": True}
