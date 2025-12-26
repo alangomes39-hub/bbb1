@@ -21,7 +21,7 @@ from telegram.ext import (
 # =====================================================
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # https://bbb1-production.up.railway.app
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "5067341383"))
 
 DB_FILE = "database.db"
@@ -96,15 +96,6 @@ async def get_last_order_for_user(user_id):
         """, (user_id,))
         return await cur.fetchone()
 
-async def get_2026_buyers():
-    async with aiosqlite.connect(DB_FILE) as db:
-        cur = await db.execute("""
-            SELECT user_id, language, product
-            FROM orders
-            WHERE is_2026=1 AND status='approved'
-        """)
-        return await cur.fetchall()
-
 # =====================================================
 # TEXTOS
 # =====================================================
@@ -172,6 +163,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
+
     lang = q.data.replace("lang_", "")
     context.user_data["lang"] = lang
 
@@ -180,10 +172,10 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     buttons = [
         [InlineKeyboardButton("💎 Premium", callback_data="buy_premium")],
         [InlineKeyboardButton("🌟 2024/2025", callback_data="buy_2025")],
-        [InlineKeyboardButton("🌍 Russas" if lang=="pt" else "🌍 Eastern Europe", callback_data="buy_russia")],
+        [InlineKeyboardButton("🌍 Russas" if lang == "pt" else "🌍 Eastern Europe", callback_data="buy_russia")],
         [InlineKeyboardButton("🌏 Filipinas", callback_data="buy_ph")],
-        [InlineKeyboardButton("⏳ Acervo" if lang=="pt" else "⏳ Archive", callback_data="buy_archive")],
-        [InlineKeyboardButton("🤖 Pacote" if lang=="pt" else "🤖 Package", callback_data="buy_package")],
+        [InlineKeyboardButton("⏳ Acervo" if lang == "pt" else "⏳ Archive", callback_data="buy_archive")],
+        [InlineKeyboardButton("🤖 Pacote" if lang == "pt" else "🤖 Package", callback_data="buy_package")],
         [InlineKeyboardButton("📆 Canal 2026 (Pré)", callback_data="buy_2026")],
     ]
 
@@ -264,7 +256,7 @@ async def payment_methods(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["awaiting_proof"] = True
 
 # =====================================================
-# RECEIVE PROOF + ADMIN PANEL
+# RECEIVE PROOF
 # =====================================================
 
 async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -273,8 +265,21 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data["awaiting_proof"] = False
     user = update.effective_user
-
     order = await get_last_order_for_user(user.id)
+
+    if order:
+        if order[3] == "pt":
+            await update.message.reply_text(
+                "✅ Comprovante recebido com sucesso.\n\n"
+                "⏳ Seu pedido está em análise.\n"
+                "Por favor, aguarde."
+            )
+        else:
+            await update.message.reply_text(
+                "✅ Payment proof received successfully.\n\n"
+                "⏳ Your order is under review.\n"
+                "Please wait."
+            )
 
     panel = (
         f"User ID: {order[1]}\n"
@@ -294,9 +299,6 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📤 Enviar link", callback_data=f"admin_send_{order[0]}")],
     ]
 
-    if order[6]:
-        kb.append([InlineKeyboardButton("🟣 Pedido 2026", callback_data=f"admin_2026_{order[0]}")])
-
     await application.bot.send_message(
         ADMIN_CHAT_ID,
         panel,
@@ -304,7 +306,7 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =====================================================
-# ADMIN PANEL CALLBACK
+# ADMIN CALLBACK
 # =====================================================
 
 async def admin_panel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -339,11 +341,30 @@ async def admin_panel_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         context.user_data["awaiting_link"] = uid
         await q.message.reply_text("📤 Envie o link para o cliente.")
 
-    elif action == "2026":
-        await q.message.reply_text("🟣 Pedido de PRÉ-VENDA 2026.")
+# =====================================================
+# RECEIVE ADMIN LINK
+# =====================================================
+
+async def receive_admin_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_CHAT_ID:
+        return
+
+    uid = context.user_data.get("awaiting_link")
+    if not uid:
+        return
+
+    link = update.message.text
+
+    await application.bot.send_message(
+        chat_id=uid,
+        text=f"✅ Pedido aprovado!\n\n🔗 Acesso:\n{link}"
+    )
+
+    context.user_data.pop("awaiting_link", None)
+    await update.message.reply_text("✅ Link enviado com sucesso.")
 
 # =====================================================
-# FASTAPI + WEBHOOK
+# FASTAPI / WEBHOOK
 # =====================================================
 
 application: Application | None = None
@@ -362,6 +383,7 @@ async def lifespan(app: FastAPI):
     application.add_handler(CallbackQueryHandler(payment_methods, pattern="^pay_"))
     application.add_handler(CallbackQueryHandler(admin_panel_callback, pattern="^admin_"))
     application.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receive_proof))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, receive_admin_link))
 
     await application.initialize()
     await application.start()
