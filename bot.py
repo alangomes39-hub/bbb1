@@ -197,7 +197,7 @@ PRODUCTS = {
     "buy_package": ("Pacote", False),
     "buy_brasil2026": ("Brasil 2026", True),
     "buy_2026": ("Canal 2026", True),
-    "buy_brasil2025": ("Brasil 2025", False),
+    "buy_brasil2025": ("Brasil 2025", True),
 }
 
 async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
