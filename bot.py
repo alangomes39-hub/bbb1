@@ -108,7 +108,7 @@ TEXT_PT = """🎉 PROMOÇÃO IMPERDÍVEL 🎉
 🌏 Filipinas — R$50 (acesso imediato)  
 ⏳ Acervo — R$65 (acesso imediato)  
 🤖 Pacote — R$180 (acesso imediato)  
-
+🇧🇷 Brasil 2025 — R$190 (acesso imediato) 
 🆕 CANAIS 2026
 
 🇧🇷 Brasil 2026 — R$85  
@@ -172,7 +172,8 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("💎 Premium", callback_data="buy_premium")],
         [InlineKeyboardButton("🌟 2024/2025", callback_data="buy_2025")],
         [InlineKeyboardButton("🌍 Russas" if lang == "pt" else "🌍 Eastern Europe", callback_data="buy_russia")],
-        [InlineKeyboardButton("🌏 Filipinas", callback_data="buy_ph")],
+        [InlineKeyboardButton("🌏 Filipinas" if lang == "pt" else "🌍 Philippines", callback_data="buy_ph")],
+        [InlineKeyboardButton("🇧🇷 Brasil 2025", callback_data="buy_brasil2025")],
         [InlineKeyboardButton("⏳ Acervo" if lang == "pt" else "⏳ Archive", callback_data="buy_archive")],
         [InlineKeyboardButton("🤖 Pacote" if lang == "pt" else "🤖 Package", callback_data="buy_package")],
         [InlineKeyboardButton("📆 Channel 2026", callback_data="buy_2026")],
@@ -196,6 +197,7 @@ PRODUCTS = {
     "buy_package": ("Pacote", False),
     "buy_brasil2026": ("Brasil 2026", True),
     "buy_2026": ("Canal 2026", True),
+    "buy_brasil2025": ("Brasil 2025", False),
 }
 
 async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
