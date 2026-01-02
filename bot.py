@@ -129,7 +129,7 @@ TEXT_EN = """🎉 UNMISSABLE PROMOTION 🎉
 🌏 Philippines — $35 (instant access)  
 ⏳ Archive — $30 (instant access)  
 🤖 Package — $70 (instant access)  
-
+🇧🇷 Brasil 2025 — $25 (instant access) 
 🆕 2026 CHANNEL
 
 📆 Channel 2026 — $55  
@@ -197,7 +197,7 @@ PRODUCTS = {
     "buy_package": ("Pacote", False),
     "buy_brasil2026": ("Brasil 2026", True),
     "buy_2026": ("Canal 2026", True),
-    "buy_brasil2025": ("Brasil 2025", True),
+    "buy_brasil2025": ("Brasil 2025", False),
 }
 
 async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
