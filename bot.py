@@ -175,11 +175,11 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🌏 Filipinas", callback_data="buy_ph")],
         [InlineKeyboardButton("⏳ Acervo" if lang == "pt" else "⏳ Archive", callback_data="buy_archive")],
         [InlineKeyboardButton("🤖 Pacote" if lang == "pt" else "🤖 Package", callback_data="buy_package")],
-        [InlineKeyboardButton("📆 Channel 2026 (Pre-sale)", callback_data="buy_2026")],
+        [InlineKeyboardButton("📆 Channel 2026", callback_data="buy_2026")],
     ]
 
     if lang == "pt":
-        buttons.insert(6, [InlineKeyboardButton("🇧🇷 Brasil 2026 (Pré)", callback_data="buy_brasil2026")])
+        buttons.insert(6, [InlineKeyboardButton("🇧🇷 Brasil 2026", callback_data="buy_brasil2026")])
 
     await q.message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons))
 
