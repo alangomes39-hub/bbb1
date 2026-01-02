@@ -102,46 +102,44 @@ async def get_last_order_for_user(user_id):
 
 TEXT_PT = """🎉 PROMOÇÃO IMPERDÍVEL 🎉
 
-💎 Premium — R$120 (acesso imediato)
-🌟 2024/2025 — R$60 (acesso imediato)
-🌍 Russas — R$45 (acesso imediato)
-🌏 Filipinas — R$40 (acesso imediato)
-⏳ Acervo — R$50 (acesso imediato)
-🤖 Pacote — R$150 (acesso imediato)
+💎 Premium — R$135 (acesso imediato)  
+🌟 2024/2025 — R$160 (acesso imediato)  
+🌍 Russas — R$55 (acesso imediato)  
+🌏 Filipinas — R$50 (acesso imediato)  
+⏳ Acervo — R$65 (acesso imediato)  
+🤖 Pacote — R$180 (acesso imediato)  
 
-🔥🔥 NOVOS CANAIS 2026 🔥🔥
+🆕 CANAIS 2026
 
-🇧🇷 Brasil 2026
-Valor normal: R$85
-🎁 Pré-venda: R$40
+🇧🇷 Brasil 2026 — R$85  
+📆 Canal 2026 — R$75  
 
-📆 Canal 2026
-Valor normal: R$75
-🎁 Pré-venda: R$30
-
-⚠️ ATENÇÃO:
-Acesso SOMENTE em 02/01/2026.
+📌 INFORMAÇÕES IMPORTANTES:
+• Os canais 2026 estão oficialmente liberados  
+• Acesso conforme aprovação do pagamento  
+• Grupos (exceto pacote e os canais 2026) possuem acesso vitalício
 """
+
 
 TEXT_EN = """🎉 UNMISSABLE PROMOTION 🎉
 
-💎 Premium — $50 (instant access)
-🌟 2024/2025 — $45 (instant access)
-🌍 Eastern Europe — $35 (instant access)
-🌏 Philippines — $30 (instant access)
-⏳ Archive — $25 (instant access)
-🤖 Package — $60 (instant access)
+💎 Premium — $50 (instant access)  
+🌟 2024/2025 — $90 (instant access)  
+🌍 Eastern Europe — $40 (instant access)  
+🌏 Philippines — $35 (instant access)  
+⏳ Archive — $30 (instant access)  
+🤖 Package — $70 (instant access)  
 
-🔥🔥 NEW 2026 CHANNELS 🔥🔥
+🆕 2026 CHANNEL
 
-📆 Channel 2026
-Regular price: $55
-🎁 Pre-sale: $30
+📆 Channel 2026 — $55  
 
-⚠️ IMPORTANT:
-Access ONLY on January 2nd, 2026.
-Date format: US system (MM/DD/YYYY).
+📌 IMPORTANT INFORMATION:
+• 2026 channel is officially released  
+• Access is granted after payment approval  
+• All groups (except package and the 2026 channel) include lifetime access
 """
+
 
 # =====================================================
 # START
