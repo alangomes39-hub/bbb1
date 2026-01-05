@@ -117,7 +117,7 @@ TEXT_PT = """🎉 PROMOÇÃO IMPERDÍVEL 🎉
 📌 INFORMAÇÕES IMPORTANTES:
 • Os canais 2026 estão oficialmente liberados  
 • Acesso conforme aprovação do pagamento  
-• Grupos (exceto pacote e os canais 2026) possuem acesso vitalício
+• Grupos (exceto pacote, Russas, Filipinas e os canais 2026) possuem acesso vitalício
 """
 
 
@@ -137,7 +137,7 @@ TEXT_EN = """🎉 UNMISSABLE PROMOTION 🎉
 📌 IMPORTANT INFORMATION:
 • 2026 channel is officially released  
 • Access is granted after payment approval  
-• All groups (except package and the 2026 channel) include lifetime access
+• All groups (except package, the 2026 channel, eastern europe and Ph) include lifetime access
 """
 
 
