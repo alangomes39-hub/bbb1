@@ -240,7 +240,7 @@ async def payment_methods(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await q.answer()
 
     methods = {
-        "pay_wise": "lanzinhoster@gmail.com",
+        "pay_wise": "Alangomes39@gmail.com",
         "pay_skrill": "alan_t.t.i@hotmail.com",
         "pay_binance": "USDT TRX\nTKsUrqmP2sgfHUXL4jPL8CFJCvs9taGwxY",
         "pay_btc": "Bitcoin\n13ct8pSdWBcGwGLgM4SdB38rEkixMM69H7",
